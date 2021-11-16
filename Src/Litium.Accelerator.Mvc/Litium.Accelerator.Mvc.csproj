@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <UserSecretsId>98e065ab-3604-4ade-9980-e77917dddbce</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <DockerfileContext>..\..</DockerfileContext>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Litium.Accelerator.Administration.Extensions\Litium.Accelerator.Administration.Extensions.csproj" />
+    <ProjectReference Include="..\Litium.Accelerator.Elasticsearch\Litium.Accelerator.Elasticsearch.csproj" />
+    <ProjectReference Include="..\Litium.Accelerator\Litium.Accelerator.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Litium.Accelerator.Administration.Deployment" Version="8.0.0" />
+    <PackageReference Include="Litium.Web.Setup.Elasticsearch" Version="8.0.0" />
+    <PackageReference Include="Litium.Web.Setup.Redis" Version="8.0.0" />
+    <PackageReference Include="Litium.Web.Setup.Complete" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Litium.Cloud.NLog.Extensions" Version="1.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="5.0.0" Condition=" '$(Configuration)' == 'Debug' " />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.11.1" />
+  </ItemGroup>
+
+  <Target Name="CreateDockerArguments" BeforeTargets="ContainerBuildAndLaunch">
+    <PropertyGroup>
+      <!-- Always pull to ensure that the latest image is used -->
+      <DockerfileBuildArguments>--pull</DockerfileBuildArguments>
+
+      <!-- Define the parameters for files and folders to map on the host -->
+      <DockerLitiumFiles>$(MSBuildThisFileDirectory)../files</DockerLitiumFiles>
+      <DockerLitiumLogfile>$(DockerLitiumFiles)/litium.log</DockerLitiumLogfile>
+      <DockerLitiumElasticLogfile>$(DockerLitiumFiles)/elasticsearch.log</DockerLitiumElasticLogfile>
+
+      <!-- Mappings so that files/logs inside the container is synced with 
+        files/folders foler on host
+        The Docker image used (defined in the Dockerfile) already contains 
+        the environment variable Litium__Folder__Local that defines files to 
+        be stored in app_data inside the container -->
+      <DockerfileRunArguments>$(DockerfileRunArguments) -v $(DockerLitiumFiles):/app_data:rw</DockerfileRunArguments>
+      <DockerfileRunArguments>$(DockerfileRunArguments) -v $(DockerLitiumLogfile):/app/bin/$(Configuration)/litium.log:rw</DockerfileRunArguments>
+      <DockerfileRunArguments>$(DockerfileRunArguments) -v $(DockerLitiumElasticLogfile):/app/bin/$(Configuration)/elasticsearch.log:rw</DockerfileRunArguments>
+
+      <!-- Configure the container to use the dnsresolver-container as DNS: -->
+      <DockerfileRunArguments>$(DockerfileRunArguments) --dns 192.168.65.2</DockerfileRunArguments>
+    </PropertyGroup>
+
+    <!-- Make sure that the files/folders needed exists 
+        (otherwise the automatic volume-mapping will create directories 
+        instead of files) -->
+    <MakeDir Directories="$(DockerLitiumFiles)" Condition="!Exists('$(DockerLitiumFiles)')" />
+    <Touch Files="$(DockerLitiumLogfile)" AlwaysCreate="true" Condition=" !Exists('$(DockerLitiumLogfile)')" />
+    <Touch Files="$(DockerLitiumElasticLogfile)" AlwaysCreate="true" Condition=" !Exists('$(DockerLitiumElasticLogfile)')" />
+  </Target>
+  
+</Project>
